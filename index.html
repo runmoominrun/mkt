@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Основное уравнение МКТ</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #e9ecef; font-family: 'Segoe UI', Roboto, sans-serif; }
+  
+  #canvas-container {
+    position: fixed; top: 0;
+    left: 360px; right: 360px;
+    height: 100vh;
+    z-index: 0;
+  }
+  #canvas-container canvas { display: block; width: 100% !important; height: 100% !important; }
+  
+  #center-header {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 5;
+    background: rgba(255,255,255,0.9);
+    backdrop-filter: blur(8px);
+    padding: 12px 32px;
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+    border: 2px solid transparent;
+    background-image: linear-gradient(white, white), linear-gradient(135deg, #0d9488, #f97316, #3b82f6);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+    pointer-events: none;
+  }
+  #center-header h1 {
+    font-size: 19px;
+    font-weight: 800;
+    background: linear-gradient(135deg, #0d9488, #f97316, #3b82f6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: 0.5px;
+  }
+  
+  #signature {
+    position: fixed;
+    bottom: 10px;
+    right: 14px;
+    font-size: 11px;
+    color: #94a3b8;
+    font-style: italic;
+    z-index: 20;
+    letter-spacing: 0.5px;
+  }
+  
+  .panel {
+    position: fixed; top: 0;
+    width: 360px; height: 100vh;
+    background: #fff; z-index: 10;
+    padding: 16px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.08);
+    display: flex; flex-direction: column; gap: 10px;
+    overflow-y: auto;
+  }
+  .panel::-webkit-scrollbar { width: 6px; }
+  .panel::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  #left-panel { left: 0; border-right: 2px solid #cbd5e1; }
+  #right-panel { right: 0; border-left: 2px solid #cbd5e1; }
+  
+  /* ---- ДВЕ ПЛАШКИ В РЯД ---- */
+  .metrics-row {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+  }
+  .metric-section {
+    flex: 1;
+    aspect-ratio: 1 / 1;
+    background: #1e2b3c;
+    border-radius: 14px;
+    padding: 12px;
+    color: #e2e8f0;
+    border-bottom: 3px solid #0d9488;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .metric-section.temp-section { border-bottom-color: #f97316; }
+  .metric-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1.2px; opacity: 0.7; margin-bottom: 6px; }
+  .metric-value { font-size: 28px; font-weight: 700; color: #0d9488; display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap; }
+  .temp-section .metric-value { color: #f97316; }
+  .metric-unit { font-size: 13px; font-weight: 400; color: #94a3b8; }
+  
+  /* ---- ФОРМУЛЫ ---- */
+  .formula-box {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 10px 12px;
+    border-left: 4px solid #0d9488;
+    text-align: center;
+  }
+  .formula-box.temp-formula { border-left-color: #f97316; }
+  .formula-box.conc-formula { border-left-color: #3b82f6; }
+  .formula-box.energy-formula { border-left-color: #8b5cf6; }
+  .formula-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #64748b;
+    margin-bottom: 3px;
+  }
+  .formula {
+    font-family: 'Cambria Math', 'Times New Roman', 'STIX Two Math', serif;
+    font-size: 19px;
+    font-style: italic;
+    color: #1e2b3c;
+    line-height: 1.25;
+  }
+  .formula sub { font-size: 0.65em; font-style: normal; vertical-align: sub; }
+  .formula sup { font-size: 0.65em; font-style: normal; vertical-align: super; }
+  .formula .frac {
+    display: inline-flex;
+    flex-direction: column;
+    vertical-align: middle;
+    text-align: center;
+    margin: 0 2px;
+    font-size: 0.85em;
+  }
+  .formula .frac .num { border-bottom: 1.5px solid #1e2b3c; padding: 0 3px 2px; }
+  .formula .frac .den { padding: 2px 3px 0; }
+  .formula .angle { font-style: normal; }
+  .constant-text {
+    font-size: 11px;
+    color: #475569;
+    text-align: center;
+    margin-top: 4px;
+    font-style: italic;
+  }
+  
+  .control-group {
+    display: flex; flex-direction: column; gap: 4px;
+    background: #f8fafc; padding: 12px 14px;
+    border-radius: 12px; border-left: 4px solid #f97316;
+  }
+  .control-group label { display: flex; justify-content: space-between; font-size: 14px; font-weight: 600; align-items: baseline; }
+  .control-group label span:last-child { color: #0d9488; font-weight: 700; }
+  .scale-hint { font-size: 10px; color: #94a3b8; font-weight: 400; }
+  input[type=range] { width: 100%; accent-color: #0d9488; cursor: pointer; margin: 3px 0; }
+  
+  .gas-section-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e2b3c;
+    margin-bottom: 4px;
+  }
+  .gas-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 7px;
+  }
+  .gas-btn {
+    padding: 10px 6px;
+    border: 2px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: #334155;
+    transition: all 0.15s;
+    text-align: center;
+    line-height: 1.2;
+  }
+  .gas-btn:hover { border-color: #0d9488; background: #f0fdfa; }
+  .gas-btn.active {
+    border-color: #0d9488;
+    background: #0d9488;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 2px 6px rgba(13, 148, 136, 0.3);
+  }
+  .gas-mass-info {
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: #475569;
+    border-left: 4px solid #3b82f6;
+  }
+  .gas-mass-info .mass-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 3px; }
+  .gas-mass-info .mass-value { font-weight: 700; color: #1e2b3c; font-size: 14px; }
+  
+  .toggle-group {
+    display: flex; align-items: center; gap: 10px;
+    background: #f8fafc; padding: 10px 14px;
+    border-radius: 12px; border-left: 4px solid #3b82f6;
+  }
+  .toggle-group label { font-size: 14px; font-weight: 600; color: #1e2b3c; cursor: pointer; display: flex; align-items: center; gap: 10px; flex: 1; }
+  .toggle-group input[type="checkbox"] { width: 17px; height: 17px; accent-color: #3b82f6; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="center-header">
+  <h1>Молекулярно-кинетическая теория идеального газа</h1>
+</div>
+
+<div id="left-panel" class="panel">
+  <!-- Две плашки в ряд -->
+  <div class="metrics-row">
+    <div class="metric-section">
+      <div class="metric-label">Давление (p)</div>
+      <div class="metric-value">
+        <span id="pressureDisplay">0.00</span>
+        <span class="metric-unit" id="pressureUnit">кПа</span>
+      </div>
+    </div>
+    <div class="metric-section temp-section">
+      <div class="metric-label">Температура (T)</div>
+      <div class="metric-value">
+        <span id="tempDisplay">0.0</span>
+        <span class="metric-unit">К</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="formula-box">
+    <div class="formula-label">Основное уравнение МКТ</div>
+    <div class="formula">
+      p = <span class="frac"><span class="num">1</span><span class="den">3</span></span> · m<sub>0</sub> · ⟨v⟩<sup>2</sup> · n
+    </div>
+  </div>
+
+  <div class="formula-box energy-formula">
+    <div class="formula">
+      p = <span class="frac"><span class="num">2</span><span class="den">3</span></span> · ⟨E⟩ · n
+    </div>
+  </div>
+
+  <div class="formula-box temp-formula">
+    <div class="formula-label">Связь температуры и скорости</div>
+    <div class="formula">
+      T = <span class="frac"><span class="num">m<sub>0</sub> · ⟨v⟩<sup>2</sup></span><span class="den">3 · k</span></span>
+    </div>
+  </div>
+
+  <div class="formula-box conc-formula">
+    <div class="formula-label">Концентрация частиц</div>
+    <div class="formula">
+      n = <span class="frac"><span class="num">N</span><span class="den">V</span></span>
+    </div>
+  </div>
+
+  <div class="formula-box">
+    <div class="formula-label">Связь давления и температуры</div>
+    <div class="formula">
+      p = n · k · T
+    </div>
+  </div>
+
+  <div class="formula-box energy-formula">
+    <div class="formula-label">Связь средней кинетической энергии и температуры</div>
+    <div class="formula">
+      ⟨E⟩ = <span class="frac"><span class="num">3</span><span class="den">2</span></span> · k · T
+    </div>
+  </div>
+
+  <div class="constant-text">
+    Постоянная Больцмана: k = 1,38 · 10<sup>−23</sup> Дж/К
+  </div>
+</div>
+
+<div id="canvas-container"></div>
+
+<div id="right-panel" class="panel">
+  <div class="control-group">
+    <label>Число частиц N <span id="nValue">60 <span class="scale-hint">× 10²¹</span></span></label>
+    <input type="range" id="nSlider" min="20" max="1000" step="25" value="60">
+  </div>
+
+  <div class="control-group">
+    <label>Объём V <span id="vValue">1.00 м³</span></label>
+    <input type="range" id="vSlider" min="0.40" max="2.00" step="0.05" value="1.00">
+  </div>
+
+  <div class="control-group">
+    <label>Скорость ⟨v⟩ <span id="vRmsValue">500 м/с</span></label>
+    <input type="range" id="vRmsSlider" min="100" max="2000" step="50" value="500">
+  </div>
+
+  <div class="toggle-group">
+    <label for="vectorToggle"><input type="checkbox" id="vectorToggle"> Показать векторы скорости</label>
+  </div>
+
+  <div class="gas-section-title">Выбор газа</div>
+  <div class="gas-grid" id="gasGrid"></div>
+  
+  <div class="gas-mass-info">
+    <div class="mass-label">Масса одной частицы</div>
+    <div class="mass-value" id="gasMassDisplay">m₀ = 4.65 × 10⁻²⁶ кг</div>
+  </div>
+
+  <div class="formula-box conc-formula" style="border-left-color: #3b82f6;">
+    <div class="formula-label">Масса частицы через молярную массу и число Авогадро</div>
+    <div class="formula">
+      m<sub>0</sub> = <span class="frac"><span class="num">M</span><span class="den">N<sub>A</sub></span></span>
+    </div>
+    <div class="constant-text">
+      Число Авогадро: N<sub>A</sub> = 6 · 10<sup>23</sup> моль<sup>−1</sup>
+    </div>
+  </div>
+</div>
+
+<div id="signature">АлексеЕВа</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  const kB = 1.380649e-23;
+  const gases = [
+    { name: 'H₂',  fullName: 'Водород',    m0: 3.34e-27, molar: 2.016 },
+    { name: 'He',  fullName: 'Гелий',      m0: 6.64e-27, molar: 4.0026 },
+    { name: 'CH₄', fullName: 'Метан',      m0: 2.66e-26, molar: 16.04 },
+    { name: 'H₂O', fullName: 'Водяной пар',m0: 2.99e-26, molar: 18.015 },
+    { name: 'Ne',  fullName: 'Неон',       m0: 3.35e-26, molar: 20.180 },
+    { name: 'N₂',  fullName: 'Азот',       m0: 4.65e-26, molar: 28.013 },
+    { name: 'CO',  fullName: 'Угарный газ',m0: 4.65e-26, molar: 28.010 },
+    { name: 'O₂',  fullName: 'Кислород',   m0: 5.31e-26, molar: 31.998 },
+    { name: 'Ar',  fullName: 'Аргон',      m0: 6.63e-26, molar: 39.948 },
+    { name: 'CO₂', fullName: 'Углек. газ', m0: 7.30e-26, molar: 44.009 },
+    { name: 'O₃',  fullName: 'Озон',       m0: 7.97e-26, molar: 47.998 },
+    { name: 'Hg',  fullName: 'Пары ртути', m0: 3.33e-25, molar: 200.59 }
+  ];
+
+  const N_SCALE = 1e21;
+  const V_UNIT = 1.0;
+
+  const state = {
+    N: 60, vRms: 500, V: 1.0,
+    m0: gases[5].m0, gasIndex: 5,
+    baseSize: 8.0, showVectors: false
+  };
+  let cubeSide = state.baseSize;
+
+  const P_RADIUS = 0.15;
+  const D = P_RADIUS * 2;
+  const D2 = D * D;
+  const SOLVER_ITERS = 3;
+  const SEPARATE = 0.55;
+
+  const container = document.getElementById('canvas-container');
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xe9ecef);
+
+  const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+  camera.position.set(0, 0, 28);
+  camera.lookAt(0, 0, 0);
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  container.appendChild(renderer.domElement);
+
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.1;
+  controls.target.set(0, 0, 0);
+  controls.update();
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.8));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+  dirLight.position.set(15, 25, 15);
+  scene.add(dirLight);
+  const backLight = new THREE.DirectionalLight(0xaaccff, 0.4);
+  backLight.position.set(-15, -15, -15);
+  scene.add(backLight);
+
+  const cubeGroup = new THREE.Group();
+  scene.add(cubeGroup);
+
+  const cubeMat = new THREE.MeshPhysicalMaterial({
+    color: 0x0d9488, transparent: true, opacity: 0.1,
+    side: THREE.DoubleSide, depthWrite: false,
+    emissive: 0x0d9488, emissiveIntensity: 0.1,
+    roughness: 0.1, metalness: 0.1, transmission: 0.2
+  });
+  const cubeGeo = new THREE.BoxGeometry(cubeSide, cubeSide, cubeSide);
+  const cubeMesh = new THREE.Mesh(cubeGeo, cubeMat);
+  cubeGroup.add(cubeMesh);
+
+  const edges = new THREE.LineSegments(
+    new THREE.EdgesGeometry(cubeGeo),
+    new THREE.LineBasicMaterial({ color: 0x0f766e, linewidth: 2 })
+  );
+  cubeGroup.add(edges);
+
+  const cornerGeo = new THREE.BufferGeometry();
+  const cornerMat = new THREE.PointsMaterial({ color: 0xf97316, size: 0.25, sizeAttenuation: true });
+  cubeGroup.add(new THREE.Points(cornerGeo, cornerMat));
+  function updateCorners() {
+    const h = cubeSide / 2, pos = [];
+    for (const x of [-h, h]) for (const y of [-h, h]) for (const z of [-h, h]) pos.push(x, y, z);
+    cornerGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    cornerGeo.attributes.position.needsUpdate = true;
+  }
+  updateCorners();
+
+  const sphereGeo = new THREE.SphereGeometry(P_RADIUS, 12, 12);
+  const sphereMat = new THREE.MeshStandardMaterial({
+    color: 0xff6600, roughness: 0.3, metalness: 0.2,
+    emissive: 0x441100, emissiveIntensity: 0.3
+  });
+
+  let instancedMesh = null;
+  let posArr = null;
+  let velArr = null;
+  let speedScale = 0.02;
+  const dummy = new THREE.Object3D();
+
+  function createParticles(N) {
+    if (instancedMesh) { cubeGroup.remove(instancedMesh); instancedMesh.dispose(); }
+    instancedMesh = new THREE.InstancedMesh(sphereGeo, sphereMat, N);
+    instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+    posArr = new Float32Array(N * 3);
+    velArr = new Float32Array(N * 3);
+    const half = cubeSide / 2;
+    const bound = half - P_RADIUS;
+
+    for (let i = 0; i < N; i++) {
+      const x = (Math.random() * 2 - 1) * bound;
+      const y = (Math.random() * 2 - 1) * bound;
+      const z = (Math.random() * 2 - 1) * bound;
+      posArr[i*3] = x; posArr[i*3+1] = y; posArr[i*3+2] = z;
+      dummy.position.set(x, y, z); dummy.updateMatrix();
+      instancedMesh.setMatrixAt(i, dummy.matrix);
+
+      const th = Math.random() * Math.PI * 2;
+      const ph = Math.acos(2 * Math.random() - 1);
+      velArr[i*3]   = Math.sin(ph) * Math.cos(th);
+      velArr[i*3+1] = Math.sin(ph) * Math.sin(th);
+      velArr[i*3+2] = Math.cos(ph);
+    }
+    instancedMesh.instanceMatrix.needsUpdate = true;
+    cubeGroup.add(instancedMesh);
+    updateVisualSpeed();
+  }
+
+  function updateVisualSpeed() {
+    speedScale = 0.015 + (state.vRms - 100) / 1900 * 0.10;
+    speedScale = Math.max(0.015, Math.min(0.12, speedScale));
+  }
+
+  function pushWithWallClamp(p, i3, bx, by, bz) {
+    const half = cubeSide / 2, b = half - P_RADIUS;
+    let x = bx, y = by, z = bz;
+    if (p[i3]   + x >  b || p[i3]   + x < -b) x = 0;
+    if (p[i3+1] + y >  b || p[i3+1] + y < -b) y = 0;
+    if (p[i3+2] + z >  b || p[i3+2] + z < -b) z = 0;
+    p[i3] += x; p[i3+1] += y; p[i3+2] += z;
+  }
+
+  function stepParticles(dt) {
+    if (!posArr) return;
+    const N = state.N;
+    const half = cubeSide / 2;
+    const b = half - P_RADIUS;
+    const step = speedScale * Math.min(dt, 0.05) * 60;
+
+    for (let i = 0; i < N; i++) {
+      const i3 = i * 3;
+      let x = posArr[i3]   + velArr[i3]   * step;
+      let y = posArr[i3+1] + velArr[i3+1] * step;
+      let z = posArr[i3+2] + velArr[i3+2] * step;
+      if (x >  b) { x =  b; velArr[i3]   = -velArr[i3];   }
+      if (x < -b) { x = -b; velArr[i3]   = -velArr[i3];   }
+      if (y >  b) { y =  b; velArr[i3+1] = -velArr[i3+1]; }
+      if (y < -b) { y = -b; velArr[i3+1] = -velArr[i3+1]; }
+      if (z >  b) { z =  b; velArr[i3+2] = -velArr[i3+2]; }
+      if (z < -b) { z = -b; velArr[i3+2] = -velArr[i3+2]; }
+      posArr[i3] = x; posArr[i3+1] = y; posArr[i3+2] = z;
+    }
+
+    for (let iter = 0; iter < SOLVER_ITERS; iter++) {
+      for (let i = 0; i < N; i++) {
+        const i3 = i * 3;
+        const xi = posArr[i3], yi = posArr[i3+1], zi = posArr[i3+2];
+        for (let j = i + 1; j < N; j++) {
+          const j3 = j * 3;
+          const dx = xi - posArr[j3];
+          const dy = yi - posArr[j3+1];
+          const dz = zi - posArr[j3+2];
+          const d2 = dx*dx + dy*dy + dz*dz;
+          if (d2 >= D2 || d2 < 1e-9) continue;
+
+          const dist = Math.sqrt(d2);
+          const nx = dx / dist, ny = dy / dist, nz = dz / dist;
+
+          if (iter === 0) {
+            const s = (velArr[i3]-velArr[j3])*nx + (velArr[i3+1]-velArr[j3+1])*ny + (velArr[i3+2]-velArr[j3+2])*nz;
+            if (s < 0) {
+              velArr[i3]   -= s*nx; velArr[i3+1] -= s*ny; velArr[i3+2] -= s*nz;
+              velArr[j3]   += s*nx; velArr[j3+1] += s*ny; velArr[j3+2] += s*nz;
+            }
+          }
+
+          const corr = (D - dist) * 0.5 * SEPARATE;
+          const bx = corr*nx, by = corr*ny, bz = corr*nz;
+          pushWithWallClamp(posArr, i3,  bx,  by,  bz);
+          pushWithWallClamp(posArr, j3, -bx, -by, -bz);
+        }
+      }
+    }
+
+    for (let i = 0; i < N; i++) {
+      const i3 = i * 3;
+      if (posArr[i3]   >  b) posArr[i3]   =  b;
+      if (posArr[i3]   < -b) posArr[i3]   = -b;
+      if (posArr[i3+1] >  b) posArr[i3+1] =  b;
+      if (posArr[i3+1] < -b) posArr[i3+1] = -b;
+      if (posArr[i3+2] >  b) posArr[i3+2] =  b;
+      if (posArr[i3+2] < -b) posArr[i3+2] = -b;
+      dummy.position.set(posArr[i3], posArr[i3+1], posArr[i3+2]);
+      dummy.updateMatrix();
+      instancedMesh.setMatrixAt(i, dummy.matrix);
+    }
+    instancedMesh.instanceMatrix.needsUpdate = true;
+
+    updateVelocityVectors();
+  }
+
+  const MAX_VECTORS = 150;
+  const arrowHelpers = [];
+  const tmpDir = new THREE.Vector3();
+  function initVelocityVectors() {
+    for (let i = 0; i < MAX_VECTORS; i++) {
+      const a = new THREE.ArrowHelper(new THREE.Vector3(0,1,0), new THREE.Vector3(), 1, 0x3b82f6, 0.4, 0.2);
+      a.visible = false; cubeGroup.add(a); arrowHelpers.push(a);
+    }
+  }
+  function updateVelocityVectors() {
+    if (!state.showVectors || !posArr) { arrowHelpers.forEach(a => a.visible = false); return; }
+    const limit = Math.min(state.N, MAX_VECTORS);
+    for (let i = 0; i < limit; i++) {
+      const a = arrowHelpers[i], i3 = i*3;
+      a.visible = true;
+      a.position.set(posArr[i3], posArr[i3+1], posArr[i3+2]);
+      const vx = velArr[i3], vy = velArr[i3+1], vz = velArr[i3+2];
+      const len = Math.sqrt(vx*vx + vy*vy + vz*vz);
+      if (len > 1e-4) {
+        tmpDir.set(vx/len, vy/len, vz/len);
+        a.setDirection(tmpDir);
+        const L = Math.min(len * 0.9, 2.0);
+        a.setLength(L, L*0.25, L*0.15);
+      }
+    }
+    for (let i = limit; i < MAX_VECTORS; i++) arrowHelpers[i].visible = false;
+  }
+
+  function updateCubeSize() {
+    const newSide = state.baseSize * Math.cbrt(state.V);
+    if (Math.abs(newSide - cubeSide) < 1e-3) return;
+    cubeSide = newSide;
+    cubeMesh.geometry.dispose(); cubeMesh.geometry = new THREE.BoxGeometry(cubeSide, cubeSide, cubeSide);
+    edges.geometry.dispose(); edges.geometry = new THREE.EdgesGeometry(cubeMesh.geometry);
+    updateCorners();
+    createParticles(state.N);
+  }
+
+  function computePressure() {
+    const n = (state.N * N_SCALE) / (state.V * V_UNIT);
+    return (1/3) * state.m0 * (state.vRms * state.vRms) * n;
+  }
+  function computeTemperature() {
+    return (state.m0 * state.vRms * state.vRms) / (3 * kB);
+  }
+  function updateMetrics() {
+    const p = computePressure();
+    let vP, uP;
+    if (p >= 1e6) { vP = (p/1e6).toFixed(2); uP = 'МПа'; }
+    else if (p >= 1e3) { vP = (p/1e3).toFixed(2); uP = 'кПа'; }
+    else { vP = p.toFixed(2); uP = 'Па'; }
+    document.getElementById('pressureDisplay').textContent = vP;
+    document.getElementById('pressureUnit').textContent = uP;
+    document.getElementById('tempDisplay').textContent = computeTemperature().toFixed(1);
+  }
+
+  function syncUI() {
+    document.getElementById('nValue').innerHTML = state.N + ' <span class="scale-hint">× 10²¹</span>';
+    document.getElementById('vRmsValue').textContent = state.vRms + ' м/с';
+    document.getElementById('vValue').textContent = state.V.toFixed(2) + ' м³';
+    document.getElementById('gasMassDisplay').textContent = `m₀ = ${(state.m0 * 1e27).toFixed(2)} × 10⁻²⁷ кг`;
+    document.getElementById('nSlider').value = state.N;
+    document.getElementById('vRmsSlider').value = state.vRms;
+    document.getElementById('vSlider').value = state.V;
+    document.getElementById('vectorToggle').checked = state.showVectors;
+    document.querySelectorAll('.gas-btn').forEach((btn, i) => {
+      btn.classList.toggle('active', i === state.gasIndex);
+    });
+  }
+
+  const gasGrid = document.getElementById('gasGrid');
+  gases.forEach((g, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'gas-btn';
+    btn.textContent = g.name;
+    btn.title = g.fullName;
+    btn.addEventListener('click', () => {
+      state.gasIndex = i;
+      state.m0 = g.m0;
+      syncUI(); updateMetrics();
+    });
+    gasGrid.appendChild(btn);
+  });
+
+  document.getElementById('nSlider').addEventListener('input', e => {
+    const n = parseInt(e.target.value); if (n === state.N) return;
+    state.N = n; syncUI(); createParticles(state.N); updateMetrics();
+  });
+  document.getElementById('vRmsSlider').addEventListener('input', e => {
+    state.vRms = parseInt(e.target.value); syncUI(); updateVisualSpeed(); updateMetrics();
+  });
+  document.getElementById('vSlider').addEventListener('input', e => {
+    state.V = parseFloat(e.target.value); syncUI(); updateCubeSize(); updateMetrics();
+  });
+  document.getElementById('vectorToggle').addEventListener('change', e => { state.showVectors = e.target.checked; });
+
+  function resize() {
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+    renderer.setSize(w, h);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener('resize', resize);
+
+  let last = performance.now();
+  function loop() {
+    requestAnimationFrame(loop);
+    const now = performance.now(); const dt = (now - last) / 1000; last = now;
+    stepParticles(dt); controls.update(); renderer.render(scene, camera);
+  }
+
+  function start() {
+    resize();
+    camera.position.set(0, 0, 28); camera.lookAt(0,0,0);
+    controls.target.set(0,0,0); controls.update();
+    initVelocityVectors(); syncUI(); createParticles(state.N); updateMetrics();
+    last = performance.now(); loop();
+  }
+  window.addEventListener('load', () => requestAnimationFrame(() => requestAnimationFrame(start)));
+  if (document.readyState === 'complete') requestAnimationFrame(() => requestAnimationFrame(start));
+})();
+</script>
+</body>
+</html>
